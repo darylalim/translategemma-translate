@@ -37,7 +37,7 @@ Streamlit app for translating text using Google's [TranslateGemma 4B](https://hu
 
 `LANGUAGES` maps language name to BCP-47 code. `SOURCE_LANGS` is derived as a sorted list of all language names.
 
-All languages are bidirectional with English: Chinese (zh-CN), Dutch (nl), French (fr), German (de), Indonesian (id), Italian (it), Japanese (ja), Korean (ko), Russian (ru), Spanish (es), Thai (th), Vietnamese (vi)
+All languages are bidirectional with English: Chinese (zh-CN), Dutch (nl), French (fr), German (de), Indonesian (id), Italian (it), Spanish (es), Vietnamese (vi)
 
 ### Model Loading
 

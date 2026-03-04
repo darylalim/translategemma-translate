@@ -4,7 +4,7 @@ Streamlit app for translating text using Google's [TranslateGemma 4B](https://hu
 
 ## Supported Languages
 
-Chinese, Dutch, French, German, Indonesian, Italian, Japanese, Korean, Russian, Spanish, Thai, Vietnamese — all bidirectional with English.
+Chinese, Dutch, French, German, Indonesian, Italian, Spanish, Vietnamese — all bidirectional with English.
 
 ## Requirements
 
