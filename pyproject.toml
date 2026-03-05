@@ -9,6 +9,7 @@ dependencies = [
     "streamlit",
     "transformers",
     "torch",
+    "torchvision",
     "accelerate",
     "python-dotenv",
     "Pillow",
