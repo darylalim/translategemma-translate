@@ -105,3 +105,40 @@ def patched_translate(app_module, mock_model, mock_processor):
             "model": mock_model,
             "processor": mock_processor,
         }
+
+
+@pytest.fixture()
+def mock_processor_image():
+    """MagicMock processor configured for image translation."""
+    processor = MagicMock()
+
+    mock_input_ids = MagicMock()
+    mock_input_ids.shape = (1, 266)  # 256 image tokens + 10 prompt tokens
+
+    mock_inputs = MagicMock()
+    mock_inputs.__getitem__ = lambda self, key: (
+        mock_input_ids if key == "input_ids" else MagicMock()
+    )
+    mock_inputs.to.return_value = mock_inputs
+
+    processor.apply_chat_template.return_value = mock_inputs
+    processor.tokenizer.decode.return_value = "  translated text  "
+    processor.tokenizer.pad_token_id = 0
+    processor.tokenizer.convert_tokens_to_ids.return_value = 107
+
+    return processor
+
+
+@pytest.fixture()
+def patched_translate_image(app_module, mock_model, mock_processor_image):
+    """Patch load_model for image translation tests."""
+    with patch.object(
+        app_module,
+        "load_model",
+        return_value=(mock_model, mock_processor_image, 107, 5_000_000),
+    ):
+        yield {
+            "translate_image": app_module.translate_image,
+            "model": mock_model,
+            "processor": mock_processor_image,
+        }

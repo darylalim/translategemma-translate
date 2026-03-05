@@ -120,6 +120,63 @@ def translate(
     )
 
 
+def translate_image(
+    image: Image.Image,
+    src_code: str,
+    tgt_code: str,
+) -> TranslationResult:
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source_lang_code": src_code,
+                    "target_lang_code": tgt_code,
+                    "image": image,
+                },
+            ],
+        }
+    ]
+    model, processor, eos_token_id, _ = load_model()
+
+    t0 = time.perf_counter_ns()
+    inputs = processor.apply_chat_template(
+        messages,
+        images=[image],
+        tokenize=True,
+        add_generation_prompt=True,
+        return_dict=True,
+        return_tensors="pt",
+    ).to(model.device, dtype=torch.bfloat16)
+    input_len = inputs["input_ids"].shape[1]
+    prompt_eval_duration = time.perf_counter_ns() - t0
+
+    t1 = time.perf_counter_ns()
+    with torch.inference_mode():
+        output = model.generate(
+            **inputs,
+            do_sample=False,
+            max_new_tokens=MAX_NEW_TOKENS,
+            top_p=None,
+            top_k=None,
+            eos_token_id=eos_token_id,
+            pad_token_id=processor.tokenizer.pad_token_id,
+        )
+    eval_duration = time.perf_counter_ns() - t1
+
+    generated = output[0][input_len:]
+    return TranslationResult(
+        response=processor.tokenizer.decode(
+            generated, skip_special_tokens=True
+        ).strip(),
+        prompt_eval_count=input_len,
+        prompt_eval_duration=prompt_eval_duration,
+        eval_count=int(generated.shape[0]),
+        eval_duration=eval_duration,
+    )
+
+
 st.set_page_config(page_title="Translation Pipeline", page_icon="\U0001f310")
 st.title("Translation Pipeline")
 

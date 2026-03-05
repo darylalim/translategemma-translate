@@ -253,6 +253,84 @@ class TestTranslate:
         assert patched_translate["model"].generate.call_count == 1
 
 
+class TestTranslateImage:
+    def test_returns_translation_result(self, app_module, patched_translate_image):
+        mock_image = MagicMock()
+        result = patched_translate_image["translate_image"](mock_image, "en", "es")
+        assert isinstance(result, app_module.TranslationResult)
+
+    def test_response_is_stripped(self, patched_translate_image):
+        mock_image = MagicMock()
+        result = patched_translate_image["translate_image"](mock_image, "en", "es")
+        assert result.response == "translated text"
+
+    def test_apply_chat_template_called_with_correct_args(self, patched_translate_image):
+        mock_image = MagicMock()
+        patched_translate_image["translate_image"](mock_image, "en", "es")
+        call_kwargs = patched_translate_image["processor"].apply_chat_template.call_args[1]
+        assert call_kwargs["tokenize"] is True
+        assert call_kwargs["add_generation_prompt"] is True
+        assert call_kwargs["return_dict"] is True
+        assert call_kwargs["return_tensors"] == "pt"
+
+    def test_apply_chat_template_message_format(self, patched_translate_image):
+        mock_image = MagicMock()
+        patched_translate_image["translate_image"](mock_image, "en", "de")
+        call_args = patched_translate_image["processor"].apply_chat_template.call_args[0]
+        messages = call_args[0]
+        assert len(messages) == 1
+        assert messages[0]["role"] == "user"
+        content = messages[0]["content"][0]
+        assert content["type"] == "image"
+        assert content["source_lang_code"] == "en"
+        assert content["target_lang_code"] == "de"
+
+    def test_inputs_moved_to_model_device(self, patched_translate_image):
+        mock_image = MagicMock()
+        patched_translate_image["translate_image"](mock_image, "en", "es")
+        patched_translate_image["processor"].apply_chat_template.return_value.to.assert_called()
+
+    def test_generate_called_with_correct_args(self, patched_translate_image):
+        mock_image = MagicMock()
+        patched_translate_image["translate_image"](mock_image, "en", "es")
+        call_kwargs = patched_translate_image["model"].generate.call_args[1]
+        assert call_kwargs["do_sample"] is False
+        assert call_kwargs["max_new_tokens"] == 512
+        assert call_kwargs["top_p"] is None
+        assert call_kwargs["top_k"] is None
+        assert call_kwargs["eos_token_id"] == 107
+        assert call_kwargs["pad_token_id"] == 0
+
+    def test_decode_uses_skip_special_tokens(self, patched_translate_image):
+        mock_image = MagicMock()
+        patched_translate_image["translate_image"](mock_image, "en", "es")
+        call_kwargs = patched_translate_image["processor"].tokenizer.decode.call_args[1]
+        assert call_kwargs["skip_special_tokens"] is True
+
+    def test_prompt_eval_count_matches_input_length(self, patched_translate_image):
+        mock_image = MagicMock()
+        result = patched_translate_image["translate_image"](mock_image, "en", "es")
+        assert result.prompt_eval_count == 266
+
+    def test_eval_count_matches_generated_length(self, patched_translate_image):
+        mock_image = MagicMock()
+        result = patched_translate_image["translate_image"](mock_image, "en", "es")
+        assert result.eval_count == 5
+
+    def test_timing_durations_are_non_negative_ints(self, patched_translate_image):
+        mock_image = MagicMock()
+        result = patched_translate_image["translate_image"](mock_image, "en", "es")
+        assert isinstance(result.prompt_eval_duration, int)
+        assert isinstance(result.eval_duration, int)
+        assert result.prompt_eval_duration >= 0
+        assert result.eval_duration >= 0
+
+    def test_generate_called_exactly_once(self, patched_translate_image):
+        mock_image = MagicMock()
+        patched_translate_image["translate_image"](mock_image, "en", "es")
+        assert patched_translate_image["model"].generate.call_count == 1
+
+
 class TestLoadModel:
     def test_returns_4_tuple(self, app_module):
         mock_proc = self._make_processor()
