@@ -61,6 +61,22 @@ class HistoryEntry:
     timestamp: str
 
 
+def compute_tokens_per_sec(eval_count: int, eval_duration: int) -> float:
+    if eval_duration == 0 or eval_count == 0:
+        return 0.0
+    return eval_count / (eval_duration / 1e9)
+
+
+def compute_char_ratio(source: str, target: str) -> float:
+    if len(source) == 0 or len(target) == 0:
+        return 0.0
+    return len(target) / len(source)
+
+
+def word_count(text: str) -> int:
+    return len(text.split()) if text.strip() else 0
+
+
 def build_prompt(
     text: str,
     src_lang: str,

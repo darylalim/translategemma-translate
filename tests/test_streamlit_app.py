@@ -434,6 +434,37 @@ class TestHistoryEntry:
         assert d["results"][0]["response"] == "hola"
 
 
+class TestMetricHelpers:
+    def test_tokens_per_sec_normal(self, app_module):
+        # 10 tokens in 2 seconds (2_000_000_000 ns) = 5.0 tok/s
+        assert app_module.compute_tokens_per_sec(10, 2_000_000_000) == 5.0
+
+    def test_tokens_per_sec_zero_duration(self, app_module):
+        assert app_module.compute_tokens_per_sec(10, 0) == 0.0
+
+    def test_tokens_per_sec_zero_tokens(self, app_module):
+        assert app_module.compute_tokens_per_sec(0, 1_000_000_000) == 0.0
+
+    def test_char_ratio_normal(self, app_module):
+        # "hello" (5) -> "hola" (4) = 0.8
+        assert app_module.compute_char_ratio("hello", "hola") == 0.8
+
+    def test_char_ratio_empty_source(self, app_module):
+        assert app_module.compute_char_ratio("", "hola") == 0.0
+
+    def test_char_ratio_empty_target(self, app_module):
+        assert app_module.compute_char_ratio("hello", "") == 0.0
+
+    def test_word_count(self, app_module):
+        assert app_module.word_count("hello world foo") == 3
+
+    def test_word_count_empty(self, app_module):
+        assert app_module.word_count("") == 0
+
+    def test_word_count_whitespace(self, app_module):
+        assert app_module.word_count("   ") == 0
+
+
 class TestLoadModel:
     def test_returns_4_tuple(self, app_module):
         mock_proc = self._make_processor()
