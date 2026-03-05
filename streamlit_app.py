@@ -205,7 +205,7 @@ def translate_multi(
     tgt_codes: list[str],
 ) -> list[tuple[str, str, TranslationResult]]:
     results: list[tuple[str, str, TranslationResult]] = []
-    for tgt_lang, tgt_code in zip(tgt_langs, tgt_codes):
+    for tgt_lang, tgt_code in zip(tgt_langs, tgt_codes, strict=True):
         result = translate(text, src_lang, src_code, tgt_lang, tgt_code)
         results.append((tgt_lang, tgt_code, result))
     return results
