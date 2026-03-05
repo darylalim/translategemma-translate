@@ -334,6 +334,18 @@ with col_swap:
         on_click=_swap_languages,
     )
 
+# --- Multi-pair toggle (text mode only) ---
+multi_pair = st.checkbox("Translate to multiple languages", key="multi_pair_mode")
+
+if multi_pair:
+    selected_targets = st.multiselect(
+        "Target languages",
+        sorted(n for n in LANGUAGES if n != source),
+        key="selected_targets",
+    )
+else:
+    selected_targets = [target]
+
 # --- Tabs for text and image input ---
 uploaded_file = None
 image = None
@@ -400,10 +412,60 @@ with image_tab:
 if translate_text_clicked:
     if not text.strip():
         st.warning("Please enter text to translate.")
+    elif multi_pair and not selected_targets:
+        st.warning("Please select at least one target language.")
+    elif multi_pair:
+        # Multi-pair translation
+        try:
+            tgt_codes = [LANGUAGES[t] for t in selected_targets]
+            with st.status(
+                f"Translating to {len(selected_targets)} languages...", expanded=True
+            ) as status:
+                t0 = time.perf_counter_ns()
+                multi_results = translate_multi(
+                    text,
+                    source,
+                    LANGUAGES[source],
+                    selected_targets,
+                    tgt_codes,
+                )
+                total_duration = time.perf_counter_ns() - t0
+                status.update(
+                    label=f"Translated to {len(selected_targets)} languages in {total_duration / 1e9:.2f}s",
+                    state="complete",
+                    expanded=False,
+                )
+
+            st.session_state["multi_pair_results"] = [
+                {"target_lang": lang, "target_code": code, "result": asdict(r)}
+                for lang, code, r in multi_results
+            ]
+            st.session_state["total_duration"] = total_duration
+            st.session_state["load_duration"] = load_duration
+            st.session_state["active_mode"] = "multi"
+            st.session_state["history"].append(
+                {
+                    "mode": "text",
+                    "source_lang": source,
+                    "source_code": LANGUAGES[source],
+                    "target_langs": selected_targets,
+                    "target_codes": tgt_codes,
+                    "source_text": text,
+                    "results": [asdict(r) for _, _, r in multi_results],
+                    "total_duration": total_duration,
+                    "load_duration": load_duration,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
+            st.rerun()
+        except Exception as e:
+            logger.exception("Multi-pair translation failed")
+            st.error(f"Translation failed: {e}")
     else:
+        # Single-pair translation
         try:
             with st.status("Translating...", expanded=True) as status:
-                st.write("Running locally...")
+                st.write("Tokenizing input...")
                 t0 = time.perf_counter_ns()
                 result = translate(
                     text,
@@ -524,3 +586,31 @@ if active_result is not None:
         st.download_button(
             "Download JSON", json.dumps(data, indent=2), "translation.json"
         )
+
+# --- Multi-pair results table ---
+if st.session_state.get("active_mode") == "multi":
+    multi_results = st.session_state.get("multi_pair_results", [])
+    if multi_results:
+        total_duration = st.session_state["total_duration"]
+        total_tokens = sum(r["result"]["eval_count"] for r in multi_results)
+        total_gen_time = sum(r["result"]["eval_duration"] for r in multi_results)
+        avg_tok_sec = compute_tokens_per_sec(total_tokens, total_gen_time)
+
+        st.subheader("Multi-pair Results")
+        st.caption(
+            f"Total: {total_duration / 1e9:.2f}s \u00b7 "
+            f"Avg: {avg_tok_sec:.1f} tok/s \u00b7 "
+            f"{len(multi_results)} languages"
+        )
+
+        for r in multi_results:
+            result = r["result"]
+            tok_sec = compute_tokens_per_sec(
+                result["eval_count"], result["eval_duration"]
+            )
+            with st.expander(
+                f"**{r['target_lang']}** ({r['target_code']}) \u00b7 "
+                f"{result['eval_duration'] / 1e9:.2f}s \u00b7 "
+                f"{tok_sec:.1f} tok/s"
+            ):
+                st.code(result["response"], language=None)
