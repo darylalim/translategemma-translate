@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 MODEL_ID = "google/translategemma-4b-it"
 MAX_NEW_TOKENS = 512
 ACCEPTED_IMAGE_TYPES: list[str] = ["png", "jpg", "jpeg", "webp"]
+TRANSLATION_LABEL: str = "<label style='font-size: 0.875rem;'>Translation</label>"
 
 LANGUAGES: dict[str, str] = {
     "English": "en",
@@ -76,22 +77,14 @@ def load_model() -> tuple[Any, Any, int, int]:
     return model, processor, eos_token_id, load_duration
 
 
-def translate(
-    text: str,
-    src_lang: str,
-    src_code: str,
-    tgt_lang: str,
-    tgt_code: str,
+def _generate_and_decode(
+    model: Any,
+    processor: Any,
+    inputs: Any,
+    eos_token_id: int,
+    prompt_eval_duration: int,
 ) -> TranslationResult:
-    prompt = build_prompt(text, src_lang, src_code, tgt_lang, tgt_code)
-    model, processor, eos_token_id, _ = load_model()
-
-    t0 = time.perf_counter_ns()
-    inputs = processor.tokenizer(
-        prompt, return_tensors="pt", add_special_tokens=True
-    ).to(model.device)
     input_len = inputs["input_ids"].shape[1]
-    prompt_eval_duration = time.perf_counter_ns() - t0
 
     t1 = time.perf_counter_ns()
     with torch.inference_mode():
@@ -99,8 +92,6 @@ def translate(
             **inputs,
             do_sample=False,
             max_new_tokens=MAX_NEW_TOKENS,
-            # Override model's default generation config to suppress warnings
-            # when greedy decoding (do_sample=False) is used
             top_p=None,
             top_k=None,
             eos_token_id=eos_token_id,
@@ -117,6 +108,27 @@ def translate(
         prompt_eval_duration=prompt_eval_duration,
         eval_count=int(generated.shape[0]),
         eval_duration=eval_duration,
+    )
+
+
+def translate(
+    text: str,
+    src_lang: str,
+    src_code: str,
+    tgt_lang: str,
+    tgt_code: str,
+) -> TranslationResult:
+    prompt = build_prompt(text, src_lang, src_code, tgt_lang, tgt_code)
+    model, processor, eos_token_id, _ = load_model()
+
+    t0 = time.perf_counter_ns()
+    inputs = processor.tokenizer(
+        prompt, return_tensors="pt", add_special_tokens=True
+    ).to(model.device)
+    prompt_eval_duration = time.perf_counter_ns() - t0
+
+    return _generate_and_decode(
+        model, processor, inputs, eos_token_id, prompt_eval_duration
     )
 
 
@@ -148,31 +160,10 @@ def translate_image(
         return_dict=True,
         return_tensors="pt",
     ).to(model.device, dtype=torch.bfloat16)
-    input_len = inputs["input_ids"].shape[1]
     prompt_eval_duration = time.perf_counter_ns() - t0
 
-    t1 = time.perf_counter_ns()
-    with torch.inference_mode():
-        output = model.generate(
-            **inputs,
-            do_sample=False,
-            max_new_tokens=MAX_NEW_TOKENS,
-            top_p=None,
-            top_k=None,
-            eos_token_id=eos_token_id,
-            pad_token_id=processor.tokenizer.pad_token_id,
-        )
-    eval_duration = time.perf_counter_ns() - t1
-
-    generated = output[0][input_len:]
-    return TranslationResult(
-        response=processor.tokenizer.decode(
-            generated, skip_special_tokens=True
-        ).strip(),
-        prompt_eval_count=input_len,
-        prompt_eval_duration=prompt_eval_duration,
-        eval_count=int(generated.shape[0]),
-        eval_duration=eval_duration,
+    return _generate_and_decode(
+        model, processor, inputs, eos_token_id, prompt_eval_duration
     )
 
 
@@ -262,10 +253,7 @@ with text_tab:
     )
 
     with right_col:
-        st.markdown(
-            "<label style='font-size: 0.875rem;'>Translation</label>",
-            unsafe_allow_html=True,
-        )
+        st.markdown(TRANSLATION_LABEL, unsafe_allow_html=True)
         if prev_response:
             st.code(prev_response, language=None)
         else:
@@ -294,10 +282,7 @@ with image_tab:
     )
 
     with right_col:
-        st.markdown(
-            "<label style='font-size: 0.875rem;'>Translation</label>",
-            unsafe_allow_html=True,
-        )
+        st.markdown(TRANSLATION_LABEL, unsafe_allow_html=True)
         if prev_image_response:
             st.code(prev_image_response, language=None)
         else:
@@ -337,7 +322,7 @@ if translate_text_clicked:
 
 # --- Image translation handler ---
 if translate_image_clicked:
-    if uploaded_file is None:
+    if image is None:
         st.warning("Please upload an image to translate.")
     else:
         try:
