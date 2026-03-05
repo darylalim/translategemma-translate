@@ -15,12 +15,26 @@ def app_module():
     col1, col_swap, col2 = MagicMock(), MagicMock(), MagicMock()
     col1.selectbox.return_value = "English"
     col2.selectbox.return_value = "Spanish"
-    left_col, right_col = MagicMock(), MagicMock()
+
+    # Text tab columns
+    text_left_col, text_right_col = MagicMock(), MagicMock()
+    # Image tab columns
+    img_left_col, img_right_col = MagicMock(), MagicMock()
+
     mock_st.columns.side_effect = [
-        (col1, col_swap, col2),
-        (left_col, right_col),
+        (col1, col_swap, col2),       # language selectors
+        (text_left_col, text_right_col),  # text tab
+        (img_left_col, img_right_col),    # image tab
     ]
     mock_st.button.return_value = False
+
+    # Mock st.tabs to return context managers
+    text_tab = MagicMock()
+    image_tab = MagicMock()
+    mock_st.tabs.return_value = [text_tab, image_tab]
+
+    # file_uploader returns None so Image.open is not called at import time
+    mock_st.file_uploader.return_value = None
 
     mock_torch = MagicMock()
     mock_dotenv = MagicMock()
