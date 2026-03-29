@@ -199,41 +199,52 @@ def _swap_languages() -> None:
     st.session_state["target_lang"] = src
 
 
-# --- Language selectors with swap button ---
-col1, col_swap, col2 = st.columns([5, 1, 5])
+def _update_source(key: str) -> None:
+    st.session_state["source_lang"] = st.session_state[key]
 
-source = col1.selectbox(
-    "Source language",
-    SOURCE_LANGS,
-    key="source_lang",
-)
 
-# Valid targets: all languages except the selected source
-valid_targets = sorted(n for n in LANGUAGES if n != source)
-if st.session_state["target_lang"] not in valid_targets:
-    st.session_state["target_lang"] = valid_targets[0]
+def _update_target(key: str) -> None:
+    st.session_state["target_lang"] = st.session_state[key]
 
-target = col2.selectbox(
-    "Target language",
-    valid_targets,
-    key="target_lang",
-)
 
-with col_swap:
-    st.markdown("<div style='height: 1.8em'></div>", unsafe_allow_html=True)
-    st.button(
-        "\u21c4",
-        use_container_width=True,
-        on_click=_swap_languages,
-    )
-
-# --- Tabs for text and image input ---
-uploaded_file = None
-image = None
+# --- Tabs above language selectors ---
 text_tab, image_tab = st.tabs(["Text", "Image"])
 
 # --- Text tab ---
 with text_tab:
+    st.session_state["text_source_lang"] = st.session_state["source_lang"]
+
+    col1, col_swap, col2 = st.columns([5, 1, 5])
+    source = col1.selectbox(
+        "Source language",
+        SOURCE_LANGS,
+        key="text_source_lang",
+        on_change=_update_source,
+        args=("text_source_lang",),
+    )
+
+    valid_targets = sorted(n for n in LANGUAGES if n != source)
+    if st.session_state["target_lang"] not in valid_targets:
+        st.session_state["target_lang"] = valid_targets[0]
+
+    st.session_state["text_target_lang"] = st.session_state["target_lang"]
+    target = col2.selectbox(
+        "Target language",
+        valid_targets,
+        key="text_target_lang",
+        on_change=_update_target,
+        args=("text_target_lang",),
+    )
+
+    with col_swap:
+        st.markdown("<div style='height: 1.8em'></div>", unsafe_allow_html=True)
+        st.button(
+            "\u21c4",
+            use_container_width=True,
+            on_click=_swap_languages,
+            key="text_swap",
+        )
+
     left_col, right_col = st.columns(2)
 
     with left_col:
@@ -244,7 +255,10 @@ with text_tab:
         )
         st.caption(f"{word_count(text)} words \u00b7 {len(text)} characters")
         translate_text_clicked = st.button(
-            "Translate", type="primary", use_container_width=True, key="translate_text"
+            "Translate",
+            type="primary",
+            use_container_width=True,
+            key="translate_text",
         )
 
     prev_response = (
@@ -254,17 +268,79 @@ with text_tab:
     )
 
     with right_col:
-        st.markdown(
-            "<label style='font-size: 0.875rem;'>Translation</label>",
-            unsafe_allow_html=True,
-        )
-        if prev_response:
-            st.code(prev_response, language=None)
+        with st.container(border=True):
+            if prev_response:
+                st.markdown(prev_response)
+            else:
+                st.caption("Enter text and click Translate to see results.")
+
+    if translate_text_clicked:
+        if not text.strip():
+            st.warning("Please enter text to translate.")
         else:
-            st.caption("Enter text and click Translate to see results.")
+            try:
+                with st.status("Translating...", expanded=True) as status:
+                    st.write("Tokenizing input...")
+                    t0 = time.perf_counter_ns()
+                    result = translate(
+                        text,
+                        source,
+                        LANGUAGES[source],
+                        target,
+                        LANGUAGES[target],
+                    )
+                    total_duration = time.perf_counter_ns() - t0
+                    status.update(
+                        label=f"Translated in {total_duration / 1e9:.2f}s",
+                        state="complete",
+                        expanded=False,
+                    )
+
+                st.session_state["translation_result"] = result
+                st.toast(
+                    f"{LANGUAGES[source].upper()} \u2192 {LANGUAGES[target].upper()} "
+                    f"translated in {total_duration / 1e9:.1f}s"
+                )
+                st.rerun()
+            except Exception as e:
+                logger.exception("Translation failed")
+                st.error(f"Translation failed: {e}")
 
 # --- Image tab ---
 with image_tab:
+    st.session_state["image_source_lang"] = st.session_state["source_lang"]
+
+    col1, col_swap, col2 = st.columns([5, 1, 5])
+    source = col1.selectbox(
+        "Source language",
+        SOURCE_LANGS,
+        key="image_source_lang",
+        on_change=_update_source,
+        args=("image_source_lang",),
+    )
+
+    valid_targets = sorted(n for n in LANGUAGES if n != source)
+    if st.session_state["target_lang"] not in valid_targets:
+        st.session_state["target_lang"] = valid_targets[0]
+
+    st.session_state["image_target_lang"] = st.session_state["target_lang"]
+    target = col2.selectbox(
+        "Target language",
+        valid_targets,
+        key="image_target_lang",
+        on_change=_update_target,
+        args=("image_target_lang",),
+    )
+
+    with col_swap:
+        st.markdown("<div style='height: 1.8em'></div>", unsafe_allow_html=True)
+        st.button(
+            "\u21c4",
+            use_container_width=True,
+            on_click=_swap_languages,
+            key="image_swap",
+        )
+
     left_col, right_col = st.columns(2)
 
     with left_col:
@@ -272,11 +348,15 @@ with image_tab:
             "Upload an image",
             type=ACCEPTED_IMAGE_TYPES,
         )
+        image = None
         if uploaded_file is not None:
             image = Image.open(uploaded_file)
             st.image(image, width="stretch")
         translate_image_clicked = st.button(
-            "Translate", type="primary", use_container_width=True, key="translate_image"
+            "Translate",
+            type="primary",
+            use_container_width=True,
+            key="translate_image",
         )
 
     prev_image_response = (
@@ -286,75 +366,38 @@ with image_tab:
     )
 
     with right_col:
-        st.markdown(
-            "<label style='font-size: 0.875rem;'>Translation</label>",
-            unsafe_allow_html=True,
-        )
-        if prev_image_response:
-            st.code(prev_image_response, language=None)
+        with st.container(border=True):
+            if prev_image_response:
+                st.markdown(prev_image_response)
+            else:
+                st.caption("Upload an image and click Translate to see results.")
+
+    if translate_image_clicked:
+        if image is None:
+            st.warning("Please upload an image to translate.")
         else:
-            st.caption("Upload an image and click Translate to see results.")
+            try:
+                with st.status("Translating image...", expanded=True) as status:
+                    st.write("Processing image and tokenizing...")
+                    t0 = time.perf_counter_ns()
+                    result = translate_image(
+                        image,
+                        LANGUAGES[source],
+                        LANGUAGES[target],
+                    )
+                    total_duration = time.perf_counter_ns() - t0
+                    status.update(
+                        label=f"Translated in {total_duration / 1e9:.2f}s",
+                        state="complete",
+                        expanded=False,
+                    )
 
-# --- Text translation handler ---
-if translate_text_clicked:
-    if not text.strip():
-        st.warning("Please enter text to translate.")
-    else:
-        try:
-            with st.status("Translating...", expanded=True) as status:
-                st.write("Tokenizing input...")
-                t0 = time.perf_counter_ns()
-                result = translate(
-                    text,
-                    source,
-                    LANGUAGES[source],
-                    target,
-                    LANGUAGES[target],
+                st.session_state["image_translation_result"] = result
+                st.toast(
+                    f"Image {LANGUAGES[source].upper()} \u2192 {LANGUAGES[target].upper()} "
+                    f"translated in {total_duration / 1e9:.1f}s"
                 )
-                total_duration = time.perf_counter_ns() - t0
-                status.update(
-                    label=f"Translated in {total_duration / 1e9:.2f}s",
-                    state="complete",
-                    expanded=False,
-                )
-
-            st.session_state["translation_result"] = result
-            st.toast(
-                f"{LANGUAGES[source].upper()} \u2192 {LANGUAGES[target].upper()} "
-                f"translated in {total_duration / 1e9:.1f}s"
-            )
-            st.rerun()
-        except Exception as e:
-            logger.exception("Translation failed")
-            st.error(f"Translation failed: {e}")
-
-# --- Image translation handler ---
-if translate_image_clicked:
-    if image is None:
-        st.warning("Please upload an image to translate.")
-    else:
-        try:
-            with st.status("Translating image...", expanded=True) as status:
-                st.write("Processing image and tokenizing...")
-                t0 = time.perf_counter_ns()
-                result = translate_image(
-                    image,
-                    LANGUAGES[source],
-                    LANGUAGES[target],
-                )
-                total_duration = time.perf_counter_ns() - t0
-                status.update(
-                    label=f"Translated in {total_duration / 1e9:.2f}s",
-                    state="complete",
-                    expanded=False,
-                )
-
-            st.session_state["image_translation_result"] = result
-            st.toast(
-                f"Image {LANGUAGES[source].upper()} \u2192 {LANGUAGES[target].upper()} "
-                f"translated in {total_duration / 1e9:.1f}s"
-            )
-            st.rerun()
-        except Exception as e:
-            logger.exception("Image translation failed")
-            st.error(f"Image translation failed: {e}")
+                st.rerun()
+            except Exception as e:
+                logger.exception("Image translation failed")
+                st.error(f"Image translation failed: {e}")

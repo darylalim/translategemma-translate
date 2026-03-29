@@ -21,13 +21,17 @@ def app_module():
     # Image tab columns
     img_left_col, img_right_col = MagicMock(), MagicMock()
 
-    # First call: language selectors [5, 1, 5] -> 3 columns
-    # Subsequent calls: return appropriate number of MagicMock columns
+    # Column calls (language selectors inside each tab now):
+    # 1. Text tab language selectors [5, 1, 5]
+    # 2. Text tab content [2]
+    # 3. Image tab language selectors [5, 1, 5]
+    # 4. Image tab content [2]
     _columns_calls = iter(
         [
-            (col1, col_swap, col2),  # language selectors
-            (text_left_col, text_right_col),  # text tab
-            (img_left_col, img_right_col),  # image tab
+            (col1, col_swap, col2),
+            (text_left_col, text_right_col),
+            (col1, col_swap, col2),
+            (img_left_col, img_right_col),
         ]
     )
 
@@ -50,15 +54,6 @@ def app_module():
 
     # file_uploader returns None so Image.open is not called at import time
     mock_st.file_uploader.return_value = None
-
-    # Multi-pair toggle defaults to off
-    mock_st.checkbox.return_value = False
-
-    # Multiselect returns empty list
-    mock_st.multiselect.return_value = []
-
-    # Sidebar is a MagicMock context manager
-    mock_st.sidebar = MagicMock()
 
     mock_torch = MagicMock()
     mock_dotenv = MagicMock()
