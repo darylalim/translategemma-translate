@@ -1,9 +1,7 @@
-import json
 import logging
 import os
 import time
-from dataclasses import asdict, dataclass
-from datetime import datetime
+from dataclasses import dataclass
 from typing import Any
 
 import streamlit as st
@@ -21,7 +19,6 @@ logger = logging.getLogger(__name__)
 MODEL_ID = "google/translategemma-4b-it"
 MAX_NEW_TOKENS = 512
 ACCEPTED_IMAGE_TYPES: list[str] = ["png", "jpg", "jpeg", "webp"]
-TRANSLATION_LABEL: str = "<label style='font-size: 0.875rem;'>Translation</label>"
 
 LANGUAGES: dict[str, str] = {
     "English": "en",
@@ -45,18 +42,6 @@ class TranslationResult:
     prompt_eval_duration: int
     eval_count: int
     eval_duration: int
-
-
-def compute_tokens_per_sec(eval_count: int, eval_duration: int) -> float:
-    if eval_duration == 0 or eval_count == 0:
-        return 0.0
-    return eval_count / (eval_duration / 1e9)
-
-
-def compute_char_ratio(source: str, target: str) -> float:
-    if len(source) == 0 or len(target) == 0:
-        return 0.0
-    return len(target) / len(source)
 
 
 def word_count(text: str) -> int:
@@ -183,20 +168,6 @@ def translate_image(
     )
 
 
-def translate_multi(
-    text: str,
-    src_lang: str,
-    src_code: str,
-    tgt_langs: list[str],
-    tgt_codes: list[str],
-) -> list[tuple[str, str, TranslationResult]]:
-    results: list[tuple[str, str, TranslationResult]] = []
-    for tgt_lang, tgt_code in zip(tgt_langs, tgt_codes, strict=True):
-        result = translate(text, src_lang, src_code, tgt_lang, tgt_code)
-        results.append((tgt_lang, tgt_code, result))
-    return results
-
-
 st.set_page_config(page_title="Translation Pipeline", page_icon="\U0001f310")
 st.title("Translation Pipeline")
 
@@ -205,82 +176,6 @@ if "source_lang" not in st.session_state:
     st.session_state["source_lang"] = "English"
 if "target_lang" not in st.session_state:
     st.session_state["target_lang"] = "Spanish"
-if "history" not in st.session_state:
-    st.session_state["history"] = []
-
-# --- Sidebar ---
-with st.sidebar:
-    st.header("Translation Pipeline")
-    st.caption(f"Model: {MODEL_ID}")
-    st.divider()
-
-    history: list[dict[str, Any]] = st.session_state["history"]
-
-    if history:
-        st.subheader("History")
-        for i, entry in enumerate(reversed(history)):
-            idx = len(history) - 1 - i
-            targets = ", ".join(entry["target_codes"]).upper()
-            label = f"{entry['source_code'].upper()} \u2192 {targets}"
-            preview = entry["source_text"][:40]
-            if len(entry["source_text"]) > 40:
-                preview += "..."
-            icon = "\U0001f5bc\ufe0f" if entry["mode"] == "image" else "\U0001f4dd"
-            if st.button(
-                f"{icon} {label}: {preview}",
-                key=f"history_{idx}",
-                use_container_width=True,
-            ):
-                st.session_state["source_lang"] = entry["source_lang"]
-                if len(entry["target_langs"]) == 1:
-                    st.session_state["target_lang"] = entry["target_langs"][0]
-                if entry["mode"] == "text" and len(entry["results"]) == 1:
-                    st.session_state["translation_result"] = TranslationResult(
-                        **entry["results"][0]
-                    )
-                    st.session_state["total_duration"] = entry["total_duration"]
-                    st.session_state["load_duration"] = entry["load_duration"]
-                    st.session_state["active_mode"] = "text"
-                elif entry["mode"] == "image" and len(entry["results"]) == 1:
-                    st.session_state["image_translation_result"] = TranslationResult(
-                        **entry["results"][0]
-                    )
-                    st.session_state["total_duration"] = entry["total_duration"]
-                    st.session_state["load_duration"] = entry["load_duration"]
-                    st.session_state["active_mode"] = "image"
-                elif len(entry["results"]) > 1:
-                    st.session_state["multi_pair_results"] = [
-                        {
-                            "target_lang": lang,
-                            "target_code": code,
-                            "result": result,
-                        }
-                        for lang, code, result in zip(
-                            entry["target_langs"],
-                            entry["target_codes"],
-                            entry["results"],
-                        )
-                    ]
-                    st.session_state["total_duration"] = entry["total_duration"]
-                    st.session_state["load_duration"] = entry["load_duration"]
-                    st.session_state["active_mode"] = "multi"
-                st.rerun()
-
-        st.divider()
-        col_clear, col_export = st.columns(2)
-        with col_clear:
-            if st.button("Clear", use_container_width=True):
-                st.session_state["history"] = []
-                st.rerun()
-        with col_export:
-            st.download_button(
-                "Export JSON",
-                json.dumps(history, indent=2),
-                "history.json",
-                use_container_width=True,
-            )
-    else:
-        st.caption("No translations yet. Results will appear here.")
 
 # --- Token check ---
 if not os.environ.get("HF_TOKEN"):
@@ -290,7 +185,7 @@ if not os.environ.get("HF_TOKEN"):
 # --- Model loading ---
 try:
     with st.spinner("Loading model..."):
-        model, processor, eos_token_id, load_duration = load_model()
+        model, processor, eos_token_id, _ = load_model()
 except Exception as e:
     logger.exception("Failed to load model")
     st.error(f"Failed to load model: {e}")
@@ -332,10 +227,6 @@ with col_swap:
         on_click=_swap_languages,
     )
 
-# --- Multi-pair defaults ---
-multi_pair = False
-selected_targets = [target]
-
 # --- Tabs for text and image input ---
 uploaded_file = None
 image = None
@@ -343,16 +234,6 @@ text_tab, image_tab = st.tabs(["Text", "Image"])
 
 # --- Text tab ---
 with text_tab:
-    multi_pair = st.checkbox("Translate to multiple languages", key="multi_pair_mode")
-    if multi_pair:
-        selected_targets = st.multiselect(
-            "Target languages",
-            sorted(n for n in LANGUAGES if n != source),
-            key="selected_targets",
-        )
-    else:
-        selected_targets = [target]
-
     left_col, right_col = st.columns(2)
 
     with left_col:
@@ -373,7 +254,10 @@ with text_tab:
     )
 
     with right_col:
-        st.markdown(TRANSLATION_LABEL, unsafe_allow_html=True)
+        st.markdown(
+            "<label style='font-size: 0.875rem;'>Translation</label>",
+            unsafe_allow_html=True,
+        )
         if prev_response:
             st.code(prev_response, language=None)
         else:
@@ -402,7 +286,10 @@ with image_tab:
     )
 
     with right_col:
-        st.markdown(TRANSLATION_LABEL, unsafe_allow_html=True)
+        st.markdown(
+            "<label style='font-size: 0.875rem;'>Translation</label>",
+            unsafe_allow_html=True,
+        )
         if prev_image_response:
             st.code(prev_image_response, language=None)
         else:
@@ -412,61 +299,7 @@ with image_tab:
 if translate_text_clicked:
     if not text.strip():
         st.warning("Please enter text to translate.")
-    elif multi_pair and not selected_targets:
-        st.warning("Please select at least one target language.")
-    elif multi_pair:
-        # Multi-pair translation
-        try:
-            tgt_codes = [LANGUAGES[t] for t in selected_targets]
-            with st.status(
-                f"Translating to {len(selected_targets)} languages...", expanded=True
-            ) as status:
-                t0 = time.perf_counter_ns()
-                multi_results = translate_multi(
-                    text,
-                    source,
-                    LANGUAGES[source],
-                    selected_targets,
-                    tgt_codes,
-                )
-                total_duration = time.perf_counter_ns() - t0
-                status.update(
-                    label=f"Translated to {len(selected_targets)} languages in {total_duration / 1e9:.2f}s",
-                    state="complete",
-                    expanded=False,
-                )
-
-            st.session_state["multi_pair_results"] = [
-                {"target_lang": lang, "target_code": code, "result": asdict(r)}
-                for lang, code, r in multi_results
-            ]
-            st.session_state["total_duration"] = total_duration
-            st.session_state["load_duration"] = load_duration
-            st.session_state["active_mode"] = "multi"
-            st.toast(
-                f"Translated to {len(selected_targets)} languages "
-                f"in {total_duration / 1e9:.1f}s"
-            )
-            st.session_state["history"].append(
-                {
-                    "mode": "text",
-                    "source_lang": source,
-                    "source_code": LANGUAGES[source],
-                    "target_langs": selected_targets,
-                    "target_codes": tgt_codes,
-                    "source_text": text,
-                    "results": [asdict(r) for _, _, r in multi_results],
-                    "total_duration": total_duration,
-                    "load_duration": load_duration,
-                    "timestamp": datetime.now().isoformat(),
-                }
-            )
-            st.rerun()
-        except Exception as e:
-            logger.exception("Multi-pair translation failed")
-            st.error(f"Translation failed: {e}")
     else:
-        # Single-pair translation
         try:
             with st.status("Translating...", expanded=True) as status:
                 st.write("Tokenizing input...")
@@ -486,27 +319,9 @@ if translate_text_clicked:
                 )
 
             st.session_state["translation_result"] = result
-            st.session_state["source_text_for_metrics"] = text
-            st.session_state["total_duration"] = total_duration
-            st.session_state["load_duration"] = load_duration
-            st.session_state["active_mode"] = "text"
             st.toast(
                 f"{LANGUAGES[source].upper()} \u2192 {LANGUAGES[target].upper()} "
                 f"translated in {total_duration / 1e9:.1f}s"
-            )
-            st.session_state["history"].append(
-                {
-                    "mode": "text",
-                    "source_lang": source,
-                    "source_code": LANGUAGES[source],
-                    "target_langs": [target],
-                    "target_codes": [LANGUAGES[target]],
-                    "source_text": text,
-                    "results": [asdict(result)],
-                    "total_duration": total_duration,
-                    "load_duration": load_duration,
-                    "timestamp": datetime.now().isoformat(),
-                }
             )
             st.rerun()
         except Exception as e:
@@ -535,109 +350,11 @@ if translate_image_clicked:
                 )
 
             st.session_state["image_translation_result"] = result
-            st.session_state["total_duration"] = total_duration
-            st.session_state["load_duration"] = load_duration
-            st.session_state["active_mode"] = "image"
             st.toast(
                 f"Image {LANGUAGES[source].upper()} \u2192 {LANGUAGES[target].upper()} "
                 f"translated in {total_duration / 1e9:.1f}s"
-            )
-            filename = uploaded_file.name if uploaded_file else "image"
-            st.session_state["history"].append(
-                {
-                    "mode": "image",
-                    "source_lang": source,
-                    "source_code": LANGUAGES[source],
-                    "target_langs": [target],
-                    "target_codes": [LANGUAGES[target]],
-                    "source_text": filename,
-                    "results": [asdict(result)],
-                    "total_duration": total_duration,
-                    "load_duration": load_duration,
-                    "timestamp": datetime.now().isoformat(),
-                }
             )
             st.rerun()
         except Exception as e:
             logger.exception("Image translation failed")
             st.error(f"Image translation failed: {e}")
-
-# --- Metrics in expander ---
-active_mode = st.session_state.get("active_mode")
-if active_mode == "image":
-    active_result = st.session_state.get("image_translation_result")
-elif active_mode == "text":
-    active_result = st.session_state.get("translation_result")
-else:
-    active_result = None
-
-if active_result is not None and active_mode in ("text", "image"):
-    total_duration = st.session_state["total_duration"]
-    load_duration = st.session_state["load_duration"]
-
-    tok_sec = compute_tokens_per_sec(
-        active_result.eval_count, active_result.eval_duration
-    )
-
-    data = {
-        "model": MODEL_ID,
-        "total_duration": total_duration,
-        "load_duration": load_duration,
-        "tokens_per_sec": round(tok_sec, 2),
-        **asdict(active_result),
-    }
-
-    metrics = [
-        ("Total Time", f"{total_duration / 1e9:.2f}s"),
-        ("Model Load Time", f"{load_duration / 1e9:.2f}s"),
-        ("Input Tokens", active_result.prompt_eval_count),
-        ("Input Processing Time", f"{active_result.prompt_eval_duration / 1e9:.2f}s"),
-        ("Output Tokens", active_result.eval_count),
-        ("Generation Time", f"{active_result.eval_duration / 1e9:.2f}s"),
-        ("Tokens/sec", f"{tok_sec:.1f}"),
-    ]
-
-    # Add character ratio for text mode
-    if active_mode == "text" and "translation_result" in st.session_state:
-        source_text = st.session_state.get("source_text_for_metrics", "")
-        char_ratio = compute_char_ratio(source_text, active_result.response)
-        metrics.append(("Char Ratio (tgt/src)", f"{char_ratio:.2f}"))
-        data["char_ratio"] = round(char_ratio, 4)
-
-    with st.expander("Performance details"):
-        st.caption(f"Model: {MODEL_ID}")
-        cols = st.columns(4)
-        for i, (label, value) in enumerate(metrics):
-            cols[i % 4].metric(label, value)
-
-        st.download_button(
-            "Download JSON", json.dumps(data, indent=2), "translation.json"
-        )
-
-# --- Multi-pair results table ---
-if st.session_state.get("active_mode") == "multi":
-    multi_results = st.session_state.get("multi_pair_results", [])
-    if multi_results:
-        total_duration = st.session_state["total_duration"]
-        total_tokens = sum(r["result"]["eval_count"] for r in multi_results)
-        total_gen_time = sum(r["result"]["eval_duration"] for r in multi_results)
-        avg_tok_sec = compute_tokens_per_sec(total_tokens, total_gen_time)
-
-        st.subheader("Multi-pair Results")
-        st.caption(
-            f"Total: {total_duration / 1e9:.2f}s \u00b7 "
-            f"Avg: {avg_tok_sec:.1f} tok/s \u00b7 "
-            f"{len(multi_results)} languages"
-        )
-
-        for r in multi_results:
-            result = r["result"]
-            tok_sec = compute_tokens_per_sec(
-                result["eval_count"], result["eval_duration"]
-            )
-            with st.expander(
-                f"**{r['target_lang']}** ({r['target_code']}) \u00b7 "
-                f"{result['eval_duration'] / 1e9:.2f}s \u00b7 "
-                f"{tok_sec:.1f} tok/s"
-            ):
-                st.code(result["response"], language=None)
