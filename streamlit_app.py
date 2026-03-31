@@ -212,13 +212,14 @@ text_tab, image_tab = st.tabs(["Text", "Images"])
 with text_tab:
     st.session_state["text_source_lang"] = st.session_state["source_lang"]
 
-    col1, col_swap, col2 = st.columns([5, 1, 5])
+    col1, col_swap, col2 = st.columns([10, 1, 10])
     source = col1.selectbox(
         "Source language",
         SOURCE_LANGS,
         key="text_source_lang",
         on_change=_update_source,
         args=("text_source_lang",),
+        label_visibility="collapsed",
     )
 
     valid_targets = sorted(n for n in LANGUAGES if n != source)
@@ -232,14 +233,16 @@ with text_tab:
         key="text_target_lang",
         on_change=_update_target,
         args=("text_target_lang",),
+        label_visibility="collapsed",
     )
 
     with col_swap:
-        st.markdown("<div style='height: 1.8em'></div>", unsafe_allow_html=True)
         st.button(
-            "\u21c4",
+            ":material/swap_horiz:",
+            type="tertiary",
             use_container_width=True,
             on_click=_swap_languages,
+            help="Swap languages",
             key="text_swap",
         )
 
@@ -248,27 +251,27 @@ with text_tab:
     with left_col:
         text = st.text_area(
             "Source text",
-            height=200,
+            height=300,
             max_chars=5000,
             key="source_text",
             label_visibility="collapsed",
         )
-        clear_col, count_col = st.columns(2)
-        with clear_col:
-            if st.button(":material/close:", key="clear_text"):
+        btn_translate_col, btn_clear_col, _ = st.columns([3, 1, 6])
+        with btn_translate_col:
+            translate_text_clicked = st.button(
+                "Translate",
+                type="primary",
+                key="translate_text",
+            )
+        with btn_clear_col:
+            if st.button(
+                ":material/close:",
+                type="tertiary",
+                help="Clear source text",
+                key="clear_text",
+            ):
                 st.session_state["source_text"] = ""
                 st.rerun()
-        with count_col:
-            st.markdown(
-                f'<p style="text-align:right;color:#888;font-size:0.875em">'
-                f"{len(text)}</p>",
-                unsafe_allow_html=True,
-            )
-        translate_text_clicked = st.button(
-            "Translate",
-            type="primary",
-            key="translate_text",
-        )
 
     prev_response = (
         st.session_state["translation_result"].response
@@ -282,13 +285,18 @@ with text_tab:
             "Translation output",
             placeholder="Translation",
             disabled=True,
-            height=200,
+            height=300,
             label_visibility="collapsed",
             key="text_output",
         )
-        _, copy_col, download_col = st.columns([8, 1, 1])
+        _, copy_col, download_col = st.columns([18, 1, 1])
         with copy_col:
-            if st.button(":material/content_copy:", key="copy_text"):
+            if st.button(
+                ":material/content_copy:",
+                type="tertiary",
+                help="Copy translation",
+                key="copy_text",
+            ):
                 if prev_response:
                     # json.dumps produces a JS-safe string literal
                     components.html(
@@ -306,6 +314,8 @@ with text_tab:
         with download_col:
             st.download_button(
                 label=":material/download:",
+                type="tertiary",
+                help="Download translation",
                 data=prev_response or "",
                 file_name="translation.txt",
                 mime="text/plain",
@@ -334,13 +344,14 @@ with text_tab:
 with image_tab:
     st.session_state["image_source_lang"] = st.session_state["source_lang"]
 
-    col1, col_swap, col2 = st.columns([5, 1, 5])
+    col1, col_swap, col2 = st.columns([10, 1, 10])
     source = col1.selectbox(
         "Source language",
         SOURCE_LANGS,
         key="image_source_lang",
         on_change=_update_source,
         args=("image_source_lang",),
+        label_visibility="collapsed",
     )
 
     valid_targets = sorted(n for n in LANGUAGES if n != source)
@@ -354,14 +365,16 @@ with image_tab:
         key="image_target_lang",
         on_change=_update_target,
         args=("image_target_lang",),
+        label_visibility="collapsed",
     )
 
     with col_swap:
-        st.markdown("<div style='height: 1.8em'></div>", unsafe_allow_html=True)
         st.button(
-            "\u21c4",
+            ":material/swap_horiz:",
+            type="tertiary",
             use_container_width=True,
             on_click=_swap_languages,
+            help="Swap languages",
             key="image_swap",
         )
 
@@ -395,13 +408,18 @@ with image_tab:
             "Translation output",
             placeholder="Translation",
             disabled=True,
-            height=200,
+            height=300,
             label_visibility="collapsed",
             key="image_output",
         )
-        _, copy_col, download_col = st.columns([8, 1, 1])
+        _, copy_col, download_col = st.columns([18, 1, 1])
         with copy_col:
-            if st.button(":material/content_copy:", key="copy_image"):
+            if st.button(
+                ":material/content_copy:",
+                type="tertiary",
+                help="Copy translation",
+                key="copy_image",
+            ):
                 if prev_image_response:
                     # json.dumps produces a JS-safe string literal
                     components.html(
@@ -419,6 +437,8 @@ with image_tab:
         with download_col:
             st.download_button(
                 label=":material/download:",
+                type="tertiary",
+                help="Download translation",
                 data=prev_image_response or "",
                 file_name="image_translation.txt",
                 mime="text/plain",

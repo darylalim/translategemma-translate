@@ -18,7 +18,11 @@ def app_module():
 
     # Text tab columns
     text_left_col, text_right_col = MagicMock(), MagicMock()
-    text_clear_col, text_count_col = MagicMock(), MagicMock()
+    text_btn_translate_col, text_btn_clear_col, text_btn_spacer_col = (
+        MagicMock(),
+        MagicMock(),
+        MagicMock(),
+    )
     text_spacer_col, text_copy_col, text_download_col = (
         MagicMock(),
         MagicMock(),
@@ -34,18 +38,18 @@ def app_module():
 
     # Column calls are position-dependent — update this list if st.columns
     # calls are added, removed, or reordered in streamlit_app.py:
-    # 1. Text tab language selectors [5, 1, 5]
+    # 1. Text tab language selectors [10, 1, 10]
     # 2. Text tab content [2]
-    # 3. Text tab clear/count [2]
-    # 4. Text tab copy/download [8, 1, 1]
-    # 5. Image tab language selectors [5, 1, 5]
+    # 3. Text tab translate/clear buttons [3, 1, 6]
+    # 4. Text tab copy/download [18, 1, 1]
+    # 5. Image tab language selectors [10, 1, 10]
     # 6. Image tab content [2]
-    # 7. Image tab copy/download [8, 1, 1]
+    # 7. Image tab copy/download [18, 1, 1]
     _columns_calls = iter(
         [
             (col1, col_swap, col2),
             (text_left_col, text_right_col),
-            (text_clear_col, text_count_col),
+            (text_btn_translate_col, text_btn_clear_col, text_btn_spacer_col),
             (text_spacer_col, text_copy_col, text_download_col),
             (col1, col_swap, col2),
             (img_left_col, img_right_col),
