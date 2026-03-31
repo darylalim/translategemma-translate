@@ -290,10 +290,16 @@ with text_tab:
         with copy_col:
             if st.button(":material/content_copy:", key="copy_text"):
                 if prev_response:
+                    # json.dumps produces a JS-safe string literal
                     components.html(
                         "<script>"
-                        "window.parent.navigator.clipboard.writeText("
-                        f"{json.dumps(prev_response)});"
+                        "try{window.parent.navigator.clipboard.writeText("
+                        f"{json.dumps(prev_response)});}}"
+                        "catch(e){var t=document.createElement('textarea');"
+                        f"t.value={json.dumps(prev_response)};"
+                        "document.body.appendChild(t);t.select();"
+                        "document.execCommand('copy');"
+                        "document.body.removeChild(t);}"
                         "</script>",
                         height=0,
                     )
@@ -397,10 +403,16 @@ with image_tab:
         with copy_col:
             if st.button(":material/content_copy:", key="copy_image"):
                 if prev_image_response:
+                    # json.dumps produces a JS-safe string literal
                     components.html(
                         "<script>"
-                        "window.parent.navigator.clipboard.writeText("
-                        f"{json.dumps(prev_image_response)});"
+                        "try{window.parent.navigator.clipboard.writeText("
+                        f"{json.dumps(prev_image_response)});}}"
+                        "catch(e){var t=document.createElement('textarea');"
+                        f"t.value={json.dumps(prev_image_response)};"
+                        "document.body.appendChild(t);t.select();"
+                        "document.execCommand('copy');"
+                        "document.body.removeChild(t);}"
                         "</script>",
                         height=0,
                     )
@@ -408,7 +420,7 @@ with image_tab:
             st.download_button(
                 label=":material/download:",
                 data=prev_image_response or "",
-                file_name="translation.txt",
+                file_name="image_translation.txt",
                 mime="text/plain",
                 key="download_image",
             )
