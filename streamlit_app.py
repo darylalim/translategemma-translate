@@ -20,7 +20,12 @@ logger = logging.getLogger(__name__)
 
 MODEL_ID = "google/translategemma-4b-it"
 MAX_NEW_TOKENS = 512
-ACCEPTED_IMAGE_TYPES: list[str] = ["png", "jpg", "jpeg", "webp"]
+ACCEPTED_IMAGE_TYPES: list[str] = ["jpg", "jpeg", "png", "webp"]
+DEVICE: str = (
+    "cuda"
+    if torch.cuda.is_available()
+    else "mps" if torch.backends.mps.is_available() else "cpu"
+)
 
 LANGUAGES: dict[str, str] = {
     "English": "en",
@@ -182,7 +187,7 @@ if not os.environ.get("HF_TOKEN"):
 
 # --- Model loading ---
 try:
-    with st.spinner("Loading model..."):
+    with st.spinner(f"Loading model on {DEVICE.upper()}..."):
         model, processor, eos_token_id, _ = load_model()
 except Exception as e:
     logger.exception("Failed to load model")
@@ -261,22 +266,6 @@ with text_tab:
             key="source_text",
             label_visibility="collapsed",
         )
-        btn_translate_col, btn_clear_col, _ = st.columns([3, 1, 6])
-        with btn_translate_col:
-            translate_text_clicked = st.button(
-                "Translate",
-                type="primary",
-                key="translate_text",
-            )
-        with btn_clear_col:
-            if st.button(
-                ":material/close:",
-                type="tertiary",
-                help="Clear source text",
-                key="clear_text",
-            ):
-                st.session_state["source_text"] = ""
-                st.rerun()
 
     prev_response = (
         st.session_state["translation_result"].response
@@ -294,38 +283,56 @@ with text_tab:
             label_visibility="collapsed",
             key="text_output",
         )
-        _, copy_col, download_col = st.columns([18, 1, 1])
-        with copy_col:
-            if st.button(
-                ":material/content_copy:",
-                type="tertiary",
-                help="Copy translation",
-                key="copy_text",
-            ):
-                if prev_response:
-                    # json.dumps produces a JS-safe string literal
-                    components.html(
-                        "<script>"
-                        "try{window.parent.navigator.clipboard.writeText("
-                        f"{json.dumps(prev_response)});}}"
-                        "catch(e){var t=document.createElement('textarea');"
-                        f"t.value={json.dumps(prev_response)};"
-                        "document.body.appendChild(t);t.select();"
-                        "document.execCommand('copy');"
-                        "document.body.removeChild(t);}"
-                        "</script>",
-                        height=0,
-                    )
-        with download_col:
-            st.download_button(
-                label=":material/download:",
-                type="tertiary",
-                help="Download translation",
-                data=prev_response or "",
-                file_name="translation.txt",
-                mime="text/plain",
-                key="download_text",
-            )
+
+    btn_translate_col, btn_clear_col, _, copy_col, download_col = st.columns(
+        [3, 1, 14, 1, 1]
+    )
+    with btn_translate_col:
+        translate_text_clicked = st.button(
+            "Translate",
+            type="primary",
+            key="translate_text",
+        )
+    with btn_clear_col:
+        if st.button(
+            ":material/close:",
+            type="tertiary",
+            help="Clear source text",
+            key="clear_text",
+        ):
+            st.session_state["source_text"] = ""
+            st.rerun()
+    with copy_col:
+        if st.button(
+            ":material/content_copy:",
+            type="tertiary",
+            help="Copy translation",
+            key="copy_text",
+        ):
+            if prev_response:
+                # json.dumps produces a JS-safe string literal
+                components.html(
+                    "<script>"
+                    "try{window.parent.navigator.clipboard.writeText("
+                    f"{json.dumps(prev_response)});}}"
+                    "catch(e){var t=document.createElement('textarea');"
+                    f"t.value={json.dumps(prev_response)};"
+                    "document.body.appendChild(t);t.select();"
+                    "document.execCommand('copy');"
+                    "document.body.removeChild(t);}"
+                    "</script>",
+                    height=0,
+                )
+    with download_col:
+        st.download_button(
+            label=":material/download:",
+            type="tertiary",
+            help="Download translation",
+            data=prev_response or "",
+            file_name="translation.txt",
+            mime="text/plain",
+            key="download_text",
+        )
 
     if translate_text_clicked:
         if not text.strip():
@@ -389,17 +396,13 @@ with image_tab:
         uploaded_file = st.file_uploader(
             "Upload an image",
             type=ACCEPTED_IMAGE_TYPES,
+            label_visibility="collapsed",
         )
-        st.caption("Supported file types: .jpg, .jpeg, .png, .webp.")
+
         image = None
         if uploaded_file is not None:
             image = Image.open(uploaded_file)
             st.image(image, width="stretch")
-        translate_image_clicked = st.button(
-            "Translate",
-            type="primary",
-            key="translate_image",
-        )
 
     prev_image_response = (
         st.session_state["image_translation_result"].response
@@ -417,38 +420,45 @@ with image_tab:
             label_visibility="collapsed",
             key="image_output",
         )
-        _, copy_col, download_col = st.columns([18, 1, 1])
-        with copy_col:
-            if st.button(
-                ":material/content_copy:",
-                type="tertiary",
-                help="Copy translation",
-                key="copy_image",
-            ):
-                if prev_image_response:
-                    # json.dumps produces a JS-safe string literal
-                    components.html(
-                        "<script>"
-                        "try{window.parent.navigator.clipboard.writeText("
-                        f"{json.dumps(prev_image_response)});}}"
-                        "catch(e){var t=document.createElement('textarea');"
-                        f"t.value={json.dumps(prev_image_response)};"
-                        "document.body.appendChild(t);t.select();"
-                        "document.execCommand('copy');"
-                        "document.body.removeChild(t);}"
-                        "</script>",
-                        height=0,
-                    )
-        with download_col:
-            st.download_button(
-                label=":material/download:",
-                type="tertiary",
-                help="Download translation",
-                data=prev_image_response or "",
-                file_name="image_translation.txt",
-                mime="text/plain",
-                key="download_image",
-            )
+
+    btn_translate_col, _, _, copy_col, download_col = st.columns([3, 1, 14, 1, 1])
+    with btn_translate_col:
+        translate_image_clicked = st.button(
+            "Translate",
+            type="primary",
+            key="translate_image",
+        )
+    with copy_col:
+        if st.button(
+            ":material/content_copy:",
+            type="tertiary",
+            help="Copy translation",
+            key="copy_image",
+        ):
+            if prev_image_response:
+                # json.dumps produces a JS-safe string literal
+                components.html(
+                    "<script>"
+                    "try{window.parent.navigator.clipboard.writeText("
+                    f"{json.dumps(prev_image_response)});}}"
+                    "catch(e){var t=document.createElement('textarea');"
+                    f"t.value={json.dumps(prev_image_response)};"
+                    "document.body.appendChild(t);t.select();"
+                    "document.execCommand('copy');"
+                    "document.body.removeChild(t);}"
+                    "</script>",
+                    height=0,
+                )
+    with download_col:
+        st.download_button(
+            label=":material/download:",
+            type="tertiary",
+            help="Download translation",
+            data=prev_image_response or "",
+            file_name="image_translation.txt",
+            mime="text/plain",
+            key="download_image",
+        )
 
     if translate_image_clicked:
         if image is None:
