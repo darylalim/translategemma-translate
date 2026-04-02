@@ -62,7 +62,13 @@ def translate(
 ) -> str:
     prompt = build_prompt(text, src_lang, src_code, tgt_lang, tgt_code)
     model, tokenizer = load_model()
-    return generate(model, tokenizer, prompt=prompt, max_tokens=MAX_NEW_TOKENS)
+    result = generate(model, tokenizer, prompt=prompt, max_tokens=MAX_NEW_TOKENS)
+    # Strip <end_of_turn> and any trailing garbage — the manual prompt
+    # doesn't let mlx_lm know to stop at the end-of-turn token.
+    end_token = "<end_of_turn>"
+    if end_token in result:
+        result = result[: result.index(end_token)]
+    return result.strip()
 
 
 st.set_page_config(page_title="TranslateGemma Translate", page_icon="\U0001f310")
