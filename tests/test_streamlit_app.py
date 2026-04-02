@@ -163,6 +163,106 @@ class TestTranslate:
         patched_translate["translate"]("Hello", "English", "en", "Spanish", "es")
         assert app_module.generate.call_count == 1
 
+    def test_strips_end_of_turn_token(self, app_module):
+        mock_model = MagicMock()
+        mock_tokenizer = MagicMock()
+        with (
+            patch.object(
+                app_module,
+                "load_model",
+                return_value=(mock_model, mock_tokenizer),
+            ),
+            patch.object(
+                app_module,
+                "generate",
+                return_value="hola mundo<end_of_turn>",
+            ),
+        ):
+            result = app_module.translate(
+                "hello world", "English", "en", "Spanish", "es"
+            )
+        assert result == "hola mundo"
+
+    def test_strips_repeated_end_of_turn_tokens(self, app_module):
+        mock_model = MagicMock()
+        mock_tokenizer = MagicMock()
+        with (
+            patch.object(
+                app_module,
+                "load_model",
+                return_value=(mock_model, mock_tokenizer),
+            ),
+            patch.object(
+                app_module,
+                "generate",
+                return_value="hola mundo<end_of_turn><end_of_turn><end_of_turn>",
+            ),
+        ):
+            result = app_module.translate(
+                "hello world", "English", "en", "Spanish", "es"
+            )
+        assert result == "hola mundo"
+
+    def test_clean_output_unchanged(self, app_module):
+        mock_model = MagicMock()
+        mock_tokenizer = MagicMock()
+        with (
+            patch.object(
+                app_module,
+                "load_model",
+                return_value=(mock_model, mock_tokenizer),
+            ),
+            patch.object(
+                app_module,
+                "generate",
+                return_value="hola mundo",
+            ),
+        ):
+            result = app_module.translate(
+                "hello world", "English", "en", "Spanish", "es"
+            )
+        assert result == "hola mundo"
+
+    def test_strips_whitespace_around_translation(self, app_module):
+        mock_model = MagicMock()
+        mock_tokenizer = MagicMock()
+        with (
+            patch.object(
+                app_module,
+                "load_model",
+                return_value=(mock_model, mock_tokenizer),
+            ),
+            patch.object(
+                app_module,
+                "generate",
+                return_value="  hola mundo  <end_of_turn>",
+            ),
+        ):
+            result = app_module.translate(
+                "hello world", "English", "en", "Spanish", "es"
+            )
+        assert result == "hola mundo"
+
+    def test_strips_content_after_end_of_turn(self, app_module):
+        mock_model = MagicMock()
+        mock_tokenizer = MagicMock()
+        with (
+            patch.object(
+                app_module,
+                "load_model",
+                return_value=(mock_model, mock_tokenizer),
+            ),
+            patch.object(
+                app_module,
+                "generate",
+                return_value="hola mundo<end_of_turn>extra garbage",
+            ),
+        ):
+            result = app_module.translate(
+                "hello world", "English", "en", "Spanish", "es"
+            )
+        assert result == "hola mundo"
+
 
 class TestClipboardSanitization:
     """Verify json.dumps + < escaping produces safe JS string literals.
