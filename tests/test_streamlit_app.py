@@ -1,5 +1,5 @@
 import json
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 
 class TestConstants:
@@ -292,6 +292,20 @@ class TestClipboardSanitization:
         safe = json.dumps("hello world").replace("<", "\\u003c")
         assert safe.startswith('"')
         assert safe.endswith('"')
+
+
+class TestButtonLayout:
+    def test_button_outer_split_matches_content_columns(self, app_module):
+        calls = app_module.st.columns.call_args_list
+        assert calls[2] == call(2)
+
+    def test_button_left_group_columns(self, app_module):
+        calls = app_module.st.columns.call_args_list
+        assert calls[3] == call([3, 1])
+
+    def test_button_right_group_columns(self, app_module):
+        calls = app_module.st.columns.call_args_list
+        assert calls[4] == call([6, 1, 1])
 
 
 class TestLoadModel:
