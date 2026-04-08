@@ -309,15 +309,15 @@ class TestButtonLayout:
 
 
 class TestLoadModel:
-    def test_returns_2_tuple(self, app_module):
+    def test_returns_model_and_tokenizer_from_load(self, app_module):
         mock_model = MagicMock()
         mock_tokenizer = MagicMock()
         with patch.object(
             app_module, "load", return_value=(mock_model, mock_tokenizer)
         ):
-            result = app_module.load_model()
-        assert isinstance(result, tuple)
-        assert len(result) == 2
+            model, tokenizer = app_module.load_model()
+        assert model is mock_model
+        assert tokenizer is mock_tokenizer
 
     def test_load_called_with_correct_model_id(self, app_module):
         mock_model = MagicMock()
@@ -327,3 +327,12 @@ class TestLoadModel:
         ) as mock_load:
             app_module.load_model()
         mock_load.assert_called_once_with("mlx-community/translategemma-4b-it-8bit")
+
+    def test_registers_end_of_turn_as_eos_token(self, app_module):
+        mock_model = MagicMock()
+        mock_tokenizer = MagicMock()
+        with patch.object(
+            app_module, "load", return_value=(mock_model, mock_tokenizer)
+        ):
+            app_module.load_model()
+        mock_tokenizer.add_eos_token.assert_called_once_with("<end_of_turn>")
