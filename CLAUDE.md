@@ -45,8 +45,8 @@ All languages are bidirectional with English: Chinese (zh), Dutch (nl), French (
 - Swap button moves translation output to source input and clears the result
 - 2-column side-by-side; `st.text_area` (no placeholder, `max_chars=5000`, height 300) for input, disabled `st.text_area` (placeholder "Translation", height 300) for output
 - Output text areas use `st.session_state` to set value (not the `value` parameter) to avoid stale widget state
-- Button groups inside their respective panel columns — left (inside `left_col`): translate button (primary) + clear button (`:material/close:`) in `[3, 1]`; right (inside `right_col`): copy button (`:material/content_copy:`) + download button (`:material/download:`) in `[1, 1]`
-- All icon buttons use `type="tertiary"` (no outline) with tooltip via `help`
+- Button groups inside their respective panel columns — left (inside `left_col`): translate button (primary, left) + clear button ("Clear", tertiary, right) in `[3, 2, 1]`; right (inside `right_col`): copy button ("Copy", tertiary, left) + download button ("Download", tertiary, right) in `[1, 4, 1]`
+- All utility buttons use `type="tertiary"` (no outline) with tooltip via `help`
 - Copy uses `streamlit.components.v1.html` with JS clipboard API
 - Download uses `st.download_button` with `mime="text/plain"`
 - `st.session_state` keys: `source_lang`, `target_lang`, `translation_result`, `source_text`, `text_output`
