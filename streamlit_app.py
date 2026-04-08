@@ -124,7 +124,7 @@ with col_swap:
         help="Swap languages",
     )
 
-# --- Text areas ---
+# --- Text areas and buttons ---
 left_col, right_col = st.columns(2)
 
 with left_col:
@@ -136,23 +136,6 @@ with left_col:
         label_visibility="collapsed",
     )
 
-prev_response = st.session_state.get("translation_result", "")
-
-with right_col:
-    st.session_state["text_output"] = prev_response
-    st.text_area(
-        "Translation output",
-        placeholder="Translation",
-        disabled=True,
-        height=300,
-        label_visibility="collapsed",
-        key="text_output",
-    )
-
-# --- Buttons ---
-btn_left_col, btn_right_col = st.columns(2)
-
-with btn_left_col:
     btn_translate_col, btn_clear_col = st.columns([3, 1])
     with btn_translate_col:
         translate_clicked = st.button(
@@ -171,8 +154,20 @@ with btn_left_col:
             st.session_state.pop("translation_result", None)
             st.rerun()
 
-with btn_right_col:
-    _, copy_col, download_col = st.columns([6, 1, 1])
+prev_response = st.session_state.get("translation_result", "")
+
+with right_col:
+    st.session_state["text_output"] = prev_response
+    st.text_area(
+        "Translation output",
+        placeholder="Translation",
+        disabled=True,
+        height=300,
+        label_visibility="collapsed",
+        key="text_output",
+    )
+
+    copy_col, download_col = st.columns([1, 1])
     with copy_col:
         if st.button(
             ":material/content_copy:",
