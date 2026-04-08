@@ -136,7 +136,7 @@ with left_col:
         label_visibility="collapsed",
     )
 
-    btn_translate_col, _, btn_clear_col = st.columns([3, 2, 1])
+    btn_translate_col, _, btn_clear_col = st.columns([3, 1, 2])
     with btn_translate_col:
         translate_clicked = st.button(
             "Translate",
@@ -166,7 +166,7 @@ with right_col:
         key="text_output",
     )
 
-    copy_col, _, download_col = st.columns([1, 3, 2])
+    copy_col, _, download_col = st.columns([2, 3, 2])
     with copy_col:
         if st.button(
             "Copy",
