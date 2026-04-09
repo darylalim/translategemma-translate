@@ -80,6 +80,8 @@ except Exception as e:
 
 def _swap_languages() -> None:
     state = st.session_state
+    if state["target_lang"] in FROM_ENGLISH_ONLY:
+        return
     state["source_lang"], state["target_lang"] = (
         state["target_lang"],
         state["source_lang"],
