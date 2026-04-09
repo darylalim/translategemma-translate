@@ -27,9 +27,14 @@ Streamlit app for translating text using [TranslateGemma 4B 8-bit](https://huggi
 
 ### Languages
 
-`LANGUAGES` maps language name to BCP-47 code. `SOURCE_LANGS` is derived as a sorted list of all language names.
+Language data lives in `languages.py` with two dicts from the TranslateGemma Technical Report (Tables 5 and 6):
 
-All languages are bidirectional with English: Chinese (zh), Dutch (nl), French (fr), German (de), Indonesian (id), Italian (it), Spanish (es), Vietnamese (vi).
+- `BIDIRECTIONAL` — 225 languages paired with English in both directions (can be source or target)
+- `FROM_ENGLISH_ONLY` — 70 languages that can only be targets when English is the source
+
+Derived constants: `ALL_LANGUAGES` (merged dict for lookups), `SOURCE_LANGS` (sorted bidirectional names), `TARGET_LANGS_FOR_ENGLISH` (sorted non-English names from both dicts).
+
+Directionality rules: bidirectional languages pair only with English (not with each other). From-English-only languages can only receive translations from English. The swap button is disabled when swapping would create an invalid pair.
 
 ### Model Loading
 
@@ -65,9 +70,9 @@ prompt = f"<start_of_turn>user\n{instruction}<end_of_turn>\n<start_of_turn>model
 
 `load_model()` registers `<end_of_turn>` as an EOS token so generation stops early. The `translate()` split on `<end_of_turn>` is kept as a safety net in case the token leaks into the output string.
 
-### Use `zh` not `zh-CN` for Chinese
+### Chinese uses `zh-CN` (not `zh`)
 
-TranslateGemma's chat template does not include `zh-CN` in its language dict. Use `zh` instead.
+The app uses `zh-CN` as the language code for Chinese, matching the TranslateGemma Technical Report (Table 5). This is correct because the app constructs prompts manually (not via `apply_chat_template`), and the locale code is inserted as text in the prompt string. The model was trained with these locale codes.
 
 ## Prompt Template
 
